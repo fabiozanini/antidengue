@@ -1,1 +1,7 @@
-data
+data### /home/fabio/.gitignore-boilerplates/Global/vim.gitignore
+
+.*.sw[a-z]
+*.un~
+Session.vim
+.netrwhist
+
