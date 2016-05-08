@@ -14,7 +14,10 @@ import sys
 from subprocess import call
 
 from filenames import (get_sample_table_filename,
-                       get_reads_filenames)
+                       get_reads_filenames,
+                       get_germline_db_filename,
+                       get_igblast_auxiliary_data_filename,
+                       get_igblast_execfile)
 
 
 
@@ -25,28 +28,37 @@ def run_igblast(filename):
     Parameters:
         filename - the name of the fasta
     '''
-    if filename.endswith('.fasta'):
-        outfile = filename[:-6] + '_out'
-    else:
-        outfile = filename + '_out'
-    
-    fasta_path = '/Users/davidglass/antidengue/data/fasta/'
-    ncbi_path = '/Users/davidglass/Documents/resources/ncbi-igblast-1.4.0/'
-    blast = '/Users/davidglass/Documents/resources/ncbi-igblast-1.4.0/bin/igblastn'
-    igblast_dump = '/Users/davidglass/antidengue/data/ig_parse_dump/' + outfile[:-4]
+    import tempfile
+    import shutil
+    # igblast is terrible and does stuff only in its own folder, so let's make
+    # a temp folder for that
+    tmp_foldername = tempfile.mkdtemp()
 
-    call(['cp', fasta_path + filename, ncbi_path])
-    os.chdir(ncbi_path)
-    call([blast, '-out', outfile, '-query', ncbi_path+filename, '-num_alignments_V=1', '-num_alignments_D=1',
-          '-num_alignments_J=1', '-evalue=1e-20', '-germline_db_V', ncbi_path+'database/IGHV_imgt.fasta', 
-          '-germline_db_D', ncbi_path+'database/IGHD_imgt.fasta', '-germline_db_J',
-          ncbi_path+'database/IGHJ_imgt.fasta', '-domain_system', 'imgt', '-auxiliary_data',
-          ncbi_path+'optional_file/human_gl.aux'])
-    call(['mkdir', igblast_dump])
-    call(['mv', filename, igblast_dump])
-    call(['mv', outfile, igblast_dump])
+    # Move igblast into the temp
+    igblast_tmp = tmp_foldername + 'igblastn'
+    shutil.copy(get_igblast_execfile(), igblast_tmp)
+
+    # Move input file into the temp
+    filename_tmp = tmp_foldername + 'input.fasta'
+    shutil.copy(filename, filename_tmp)
+
+    filename_out_tmp = filename_tmp[:-6] + '_out'
+
+    call([igblast_tmp,
+          '-out', filename_out_tmp,
+          '-query', filename_tmp,
+          '-num_alignments_V=1',
+          '-num_alignments_D=1',
+          '-num_alignments_J=1',
+          '-evalue=1e-20',
+          '-germline_db_V', get_germline_db_filename('V'), 
+          '-germline_db_D', get_germline_db_filename('D'),
+          '-germline_db_J', get_germline_db_filename('J'),
+          '-domain_system', 'imgt',
+          '-auxiliary_data', get_igblast_auxiliary_data_filename(),
+         ])
     
-    return outfile
+    return filename_out_tmp
 
 
 def get_sample_info_from_csv(csv):
