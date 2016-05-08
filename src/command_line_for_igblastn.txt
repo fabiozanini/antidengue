@@ -1,0 +1,4 @@
+./bin/igblastn -out seq_abd_short_out2 -query seq_abd_short.fa -num_alignments_V=1 -num_alignments_D=1 -num_alignments_J=1 -evalue=1e-20 -germline_db_V database/IGHV_imgt.fasta -germline_db_D database/IGHD_imgt.fasta -germline_db_J database/IGHJ_imgt.fasta -domain_system imgt -auxiliary_data optional_file/human_gl.aux
+
+python parse_igblast.py reversed_SRR2150126.fasta reversed_SRR2150126_out --len-C-cutoff-min 0 --len-C-cutoff-max 1000000000000
+
