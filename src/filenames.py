@@ -26,10 +26,22 @@ def get_sample_table_filename():
     return root_fn + 'sample_info.csv'
 
 
+def get_reads_foldername(fmt='fastq'):
+    '''Get the folder name of the reads'''
+    fn = get_root_data_foldername() + fmt + '/'
+    return fn
+
+
+def get_sample_filename(samplename, fmt='fastq'):
+    '''Get the filename of a sample'''
+    fn = get_reads_foldername() + samplename + '.' + fmt
+    return fn
+
+
 def get_reads_filenames(fmt='fastq'):
     '''Get the filenames of fastq/fasta files'''
     import glob
-    fn = get_root_data_foldername() + fmt + '/'
+    fn = get_reads_foldername()
     return glob.glob(fn+'*.'+fmt)
 
 

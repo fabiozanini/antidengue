@@ -14,7 +14,6 @@ import sys
 from subprocess import call
 
 from filenames import (get_sample_table_filename,
-                       get_reads_filenames,
                        get_germline_db_filename,
                        get_igblast_auxiliary_data_filename,
                        get_igblast_execfile)
@@ -61,17 +60,6 @@ def run_igblast(filename):
     return filename_out_tmp
 
 
-def get_sample_info_from_csv(csv):
-    '''Puts the info from the sample_info csv into a pandas dataframe and returns it
-     
-    Parameters:
-        csv - the csv file
-    '''
-    
-    fn = get_sample_table_filename()
-    sample_info = pd.DataFrame().from_csv(fn)
-    return sample_info
-
 
 def run_parse(fasta, blast_out, sample_info):
     '''Runs parse_igblast.py in the igblast_dump folder and sends the parsedfile to the by_patient directory
@@ -107,18 +95,58 @@ def run_parse(fasta, blast_out, sample_info):
 class LineageMaker():
     '''Make Antibody lineages from patient sequencing data'''
     def __init__(self):
-        self.sample_info = get_sample_info_from_csv()
+        self.sample_info = self._get_sample_info_from_csv()
 
 
-    def pipeline(self, filename):
+    @staticmethod
+    def _get_sample_info_from_csv():
+        '''Puts the info from the sample_info csv into a pandas dataframe and returns it
+         
+        Parameters:
+            csv - the csv file
+        '''
+        
+        fn = get_sample_table_filename()
+        sample_info = pd.DataFrame().from_csv(fn)
+        return sample_info
+
+
+    def get_reads_filenames(fmt):
+        '''Get filenames of reads
+        
+        Parameters
+           - fmt (string): 'fastq' or 'fasta'
+        '''
+        from filenames import get_reads_filenames as grf
+        return grf(fmt=fmt)
+
+    
+    def get_sample_filename(samplename, fmt='fastq'):
+        '''Get the filename of a sample'''
+        from filenames import get_sample_filename as gsf
+        return gsf(samplename, fmt=fmt)
+
+
+    def convert_reads_to_fasta():
+        '''Convert reads from FASTQ to FASTA'''
+        from filenames import get_reads_foldername as grfn
+        from util import mkdirs
+
+        # Make output folder if not existant
+        mkdirs(grfn('fasta'))
+
+        # Convert
+
+
+
+    def pipeline(self):
         '''Runs a fasta through igblast and then parses the output and properly sorts files
         
-        Parameters:
-            filename - the name of the fasta
         '''
-    
-        blast_out = run_igblast(filename)
-        run_parse(filename, blast_out, self.sample_info)
+        raw_filenames = self.get_reads_filenames('fasta')
+        for fn in raw_filenames:
+            blast_out = run_igblast(filename)
+            run_parse(filename, blast_out, self.sample_info)
 
 
 
@@ -127,7 +155,5 @@ class LineageMaker():
 if __name__ == '__main__':
 
     lm = LineageMaker()
+    #lm.pipeline()
 
-    raw_filenames = get_reads_filenames('fasta')
-    for fn in raw_filenames:
-        lm.pipeline(fn)
