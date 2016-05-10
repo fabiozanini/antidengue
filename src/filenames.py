@@ -15,7 +15,7 @@ def get_root_data_foldername():
     if 'glass' in os.getenv('HOME'):
         return '/Users/davidglass/antidengue/data/'
     elif 'fabio' in os.getenv('HOME'):
-        return os.getenv('HOME')+'university/postdoc/antidengue/data/'
+        return os.getenv('HOME')+'/university/postdoc/antidengue/data/'
     else:
         raise ValueError('user not recognized')
 
@@ -32,29 +32,54 @@ def get_reads_foldername(fmt='fastq'):
     return fn
 
 
+def get_igblasted_foldername():
+    '''Get the folder name of the blasted reads'''
+    fn = get_root_data_foldername() + 'igblasted/'
+    return fn
+
+
+def get_igblastparsed_foldername():
+    '''Get the folder name of the blasted reads'''
+    fn = get_root_data_foldername() + 'igblastparsed/'
+    return fn
+
+
 def get_sample_filename(samplename, fmt='fastq'):
     '''Get the filename of a sample'''
-    fn = get_reads_foldername() + samplename + '.' + fmt
+    if fmt in ['fastq', 'fasta']:
+        fn = get_reads_foldername(fmt=fmt) + samplename + '.' + fmt
+    elif fmt == 'igblasted':
+        fn = get_igblasted_foldername() + samplename + '.igblasted'
+    elif fmt == 'igblastparsed':
+        fn = get_igblastparsed_foldername() + samplename + '.csv'
     return fn
 
 
 def get_reads_filenames(fmt='fastq'):
     '''Get the filenames of fastq/fasta files'''
     import glob
-    fn = get_reads_foldername()
+    fn = get_reads_foldername(fmt=fmt)
     return glob.glob(fn+'*.'+fmt)
+
+
+def get_igblastdb_foldername():
+    '''Get the foldername of igblastdb, to be set as IGDATA env var'''
+    fn = get_root_data_foldername() + 'igblastdb/'
+    return fn
 
 
 def get_germline_db_filename(genename):
     '''Get the germline database filename'''
-    root_fn = get_root_data_foldername() + 'idblastdb/'
-    return root_fn + 'IGH' + genename + '_imgt.fasta'
+    fn = 'IGH' + genename + '_imgt.fasta'
+    fn = get_igblastdb_foldername() + fn
+    return fn
 
 
 def get_igblast_auxiliary_data_filename():
     '''Get the filename of the human auxiliary file for igblast'''
-    root_fn = get_root_data_foldername() + 'idblastdb/optional_file/'
-    return root_fn + 'human_gl.aux'
+    fn = 'optional_file/human_gl.aux'
+    fn = get_igblastdb_foldername() + fn
+    return fn
 
 
 def get_igblast_execfile(variant='n'):

@@ -25,7 +25,6 @@ import sys
 import os
 import json
 import re
-from distance import hamming
 from Bio.Seq import Seq
 from Bio import SeqIO
 from Bio.Seq import reverse_complement
@@ -33,8 +32,12 @@ import numpy as np
 
 verbose = False
 
+
+
+# Functions
 def main(in_sequences_abundances,
          in_igblast_out,
+         output_filename=None,
          C_primer_match_dict_file=None,
          in_sequences_reads_per_molecule=None,
          len_C_cutoff_min=80,
@@ -65,95 +68,101 @@ def main(in_sequences_abundances,
                     fo.write(line)
     in_igblast_out = in_tmp
 
-    ##### Output
-    output_dir = os.path.dirname(in_sequences_abundances)
-    if not output_dir:
-        output_dir = '.'
-    if split_num:
-        out = open("%s/parsed_igblast.txt.%s" % (output_dir,split_num), 'w')
+    # output
+    if output_filename is not None:
+        output_dir = os.path.dirname(output_filename)
+        if not output_dir:
+            output_dir = '.'
     else:
-        out = open("%s/parsed_igblast.txt" % (output_dir), 'w')
+        output_dir = os.path.dirname(in_sequences_abundances)
+        if not output_dir:
+            output_dir = '.'
+        if split_num:
+            output_filename = "%s/parsed_igblast.txt.%s" % (output_dir,split_num)
+        else:
+            output_filename = "%s/parsed_igblast.txt" % (output_dir)
 
-    out_C_seq_file = open("%s/C_seqs_without_primer.fasta.%s" % (output_dir,split_num), 'w')
+    with open(output_filename, 'w') as out:
 
-    ##### Begin parsing
-    C_primer_match_dict = load_dict(C_primer_match_dict_file) # Load matching dictionary for calling isotype
-    num_records_parsed_successfully = 0
+        out_C_seq_file = open("%s/C_seqs_without_primer.fasta.%s" % (output_dir,split_num), 'w')
 
-    global error_counts
-    error_counts = {}
-    error_counts["no_hits_found"] = 0
-    error_counts["no_CDR3_start"] = 0
-    error_counts["no_CDR3_end"] = 0
-    error_counts["no_alignment_summary"] = 0
-    error_counts["V_Evalue_greater_than_cutoff"] = 0
-    error_counts["J_Evalue_greater_than_cutoff"] = 0
-    error_counts["len_C_too_small_large"] = 0
-    error_counts["no_V_call"] = 0
-    error_counts["no_J_call"] = 0
+        ##### Begin parsing
+        C_primer_match_dict = load_dict(C_primer_match_dict_file) # Load matching dictionary for calling isotype
+        num_records_parsed_successfully = 0
 
-    global seq_ids
-    seq_ids = {}
-    seq_ids["no_hits_found"] = []
-    seq_ids["no_CDR3_start"] = []
-    seq_ids["no_CDR3_end"] = []
-    seq_ids["no_alignment_summary"] = []
-    seq_ids["V_Evalue_greater_than_cutoff"] = []
-    seq_ids["J_Evalue_greater_than_cutoff"] = []
-    seq_ids["len_C_too_small_large"] = []
-    seq_ids["no_V_call"] = []
-    seq_ids["no_J_call"] = []
+        global error_counts
+        error_counts = {}
+        error_counts["no_hits_found"] = 0
+        error_counts["no_CDR3_start"] = 0
+        error_counts["no_CDR3_end"] = 0
+        error_counts["no_alignment_summary"] = 0
+        error_counts["V_Evalue_greater_than_cutoff"] = 0
+        error_counts["J_Evalue_greater_than_cutoff"] = 0
+        error_counts["len_C_too_small_large"] = 0
+        error_counts["no_V_call"] = 0
+        error_counts["no_J_call"] = 0
 
-    global log_V_Evalues
-    global log_D_Evalues
-    global log_J_Evalues
+        global seq_ids
+        seq_ids = {}
+        seq_ids["no_hits_found"] = []
+        seq_ids["no_CDR3_start"] = []
+        seq_ids["no_CDR3_end"] = []
+        seq_ids["no_alignment_summary"] = []
+        seq_ids["V_Evalue_greater_than_cutoff"] = []
+        seq_ids["J_Evalue_greater_than_cutoff"] = []
+        seq_ids["len_C_too_small_large"] = []
+        seq_ids["no_V_call"] = []
+        seq_ids["no_J_call"] = []
 
-    log_V_Evalues = []
-    log_D_Evalues = []
-    log_J_Evalues = []
+        global log_V_Evalues
+        global log_D_Evalues
+        global log_J_Evalues
 
-    ### Load original query sequences
-    sequences = {seq.id: ''.join(seq) for seq in SeqIO.parse(in_sequences_abundances, 'fasta')}
+        log_V_Evalues = []
+        log_D_Evalues = []
+        log_J_Evalues = []
 
-    ### Load read per molecule counts
-    if in_sequences_reads_per_molecule != '1':
-        reads_per_molecule = {}
-        file_length = get_file_length(in_sequences_reads_per_molecule)
-        line_num = 0
-        with open(in_sequences_reads_per_molecule, 'rU') as f:
-            while line_num < file_length:
-                seq_id = f.readline().rstrip().split(">")[1]
-                my_reads_per_molecule = f.readline().rstrip()
-                reads_per_molecule[seq_id] = my_reads_per_molecule
-                line_num += 2
-    else:
-        reads_per_molecule = {readname: 1 for readname in sequences}
+        ### Load original query sequences
+        sequences = {seq.id: ''.join(seq) for seq in SeqIO.parse(in_sequences_abundances, 'fasta')}
 
-    ### Parse igblast output
-    with open(in_igblast_out, 'rU') as f:
+        ### Load read per molecule counts
+        if in_sequences_reads_per_molecule is not None:
+            reads_per_molecule = {}
+            file_length = get_file_length(in_sequences_reads_per_molecule)
+            line_num = 0
+            with open(in_sequences_reads_per_molecule, 'rU') as f:
+                while line_num < file_length:
+                    seq_id = f.readline().rstrip().split(">")[1]
+                    my_reads_per_molecule = f.readline().rstrip()
+                    reads_per_molecule[seq_id] = my_reads_per_molecule
+                    line_num += 2
+        else:
+            reads_per_molecule = {readname: 1 for readname in sequences}
 
-    # concatenated igblast file no longer has headers or footers
-    #    readlines(f, n = 15) # skip header
+        ### Parse igblast output
+        with open(in_igblast_out, 'rU') as f:
 
-        while True:
+        # concatenated igblast file no longer has headers or footers
+        #    readlines(f, n = 15) # skip header
 
-            line = f.readline()
-            if "Query=" in line:
-                seq_id = line.rstrip().split(" ")[1]
-                seq = sequences[seq_id]
-                my_reads_per_molecule = reads_per_molecule[seq_id]
-                num_records_parsed_successfully += parse_record(f, seq_id, seq, out, out_C_seq_file, C_primer_match_dict,
-                                                                len_C_cutoff_min, len_C_cutoff_max,
-                                                                log_V_Evalue_cutoff, log_J_Evalue_cutoff,
-                                                                my_reads_per_molecule)
-            else:
-                if verbose:
-                    print("Done!!")
-                    print("Parsed successfully:", num_records_parsed_successfully)
-                    print("Errors:", error_counts)
-                break
+            while True:
 
-    out.close()
+                line = f.readline()
+                if "Query=" in line:
+                    seq_id = line.rstrip().split(" ")[1]
+                    seq = sequences[seq_id]
+                    my_reads_per_molecule = reads_per_molecule[seq_id]
+                    num_records_parsed_successfully += parse_record(f, seq_id, seq, out, out_C_seq_file, C_primer_match_dict,
+                                                                    len_C_cutoff_min, len_C_cutoff_max,
+                                                                    log_V_Evalue_cutoff, log_J_Evalue_cutoff,
+                                                                    my_reads_per_molecule)
+                else:
+                    if verbose:
+                        print("Done!!")
+                        print("Parsed successfully:", num_records_parsed_successfully)
+                        print("Errors:", error_counts)
+                    break
+
 
 
     ### Write losses to log
@@ -206,11 +215,13 @@ def main(in_sequences_abundances,
         for seq_id in seq_ids["no_J_call"]:
             f.write(str(seq_id)+"\n")
 
+
 def get_file_length(f):
     L = 0
     with open(f, 'rU') as infile:
         for line in infile: L += 1
     return L
+
 
 def load_dict(f=None):
     d = {}
@@ -226,8 +237,10 @@ def load_dict(f=None):
             pass
     return d
 
+
 def readlines(f, n):
     for i in range(n): f.readline()
+
 
 def readlines_to_end_of_record(f):
     while True:
@@ -236,6 +249,7 @@ def readlines_to_end_of_record(f):
             readlines(f, n = 2)
             break
     return None
+
 
 def parse_record(f, seq_id, seq, out, out_C_seq_file, C_primer_match_dict, len_C_cutoff_min, len_C_cutoff_max, log_V_Evalue_cutoff, log_J_Evalue_cutoff, my_reads_per_molecule):
 
@@ -422,11 +436,13 @@ def parse_record(f, seq_id, seq, out, out_C_seq_file, C_primer_match_dict, len_C
 
     return 1
 
+
 def get_germline_gene_Evalue(line):
     vals = line.rstrip().split()
     gene = vals[0].split("lcl|")[1]
     E = vals[2]
     return gene, E
+
 
 def get_stop_codon_productive(line):
     vals = line.rstrip().split("\t")
@@ -443,15 +459,18 @@ def get_stop_codon_productive(line):
 
     return stop_codon, productive
 
+
 def get_start(line):
     vals = line.rstrip().split("\t")
     return int(vals[1])
+
 
 def get_end(line):
     vals = line.rstrip().split("\t")
     return int(vals[2])
 
-def parse_(f):
+
+def parse_boundaries(f):
 
     boundaries = [-1, -1, -1, -1, -1, -1, -1]
 
@@ -471,6 +490,7 @@ def parse_(f):
             break
 
     return boundaries, alignment_length
+
 
 def parse_alignment(f):
 
@@ -539,6 +559,7 @@ def parse_alignment(f):
 
     return query_start_position, query_reversed, query_end_position, mutation_positions, germline_bases, derived_bases, V_germline_identity
 
+
 def call_mutations(query, germline, germline_gene, start_position_in_germline, last_position_in_germline, entered_alignment=False):
 
     mutation_positions = []
@@ -563,24 +584,34 @@ def call_mutations(query, germline, germline_gene, start_position_in_germline, l
 
     return mutation_positions, germline_bases, derived_bases
 
+
 def call_CDR3_start(VDJ_seq):
+    '''Find the start of the CDR3'''
+    try:
+        from distance import hamming
+    except ImportError:
+        from util import hamming
 
     CDR3_start_anchor_sequence = 'TATTACTGT'
     minimum_match_distance = 2
     CDR3_start = -1
 
     for i in range(0, len(VDJ_seq) - len(CDR3_start_anchor_sequence) - 1):
-        
         d = hamming(VDJ_seq[i:i+len(CDR3_start_anchor_sequence)], CDR3_start_anchor_sequence)
        
         if d <= minimum_match_distance:
             CDR3_start = i + len(CDR3_start_anchor_sequence) + 1
             minimum_match_distance = d
 
-
     return CDR3_start
 
+
 def call_CDR3_end(VDJ_seq, CDR3_start):
+    '''Find the end of the CDR3'''
+    try:
+        from distance import hamming
+    except ImportError:
+        from util import hamming
 
     CDR3_end_anchor_sequence = 'CTGGGG'
     minimum_match_distance = 1
@@ -597,7 +628,8 @@ def call_CDR3_end(VDJ_seq, CDR3_start):
             minimum_match_distance = d
 
     return CDR3_end    
-    
+   
+
 def call_C_primer(C_seq, C_primer_match_dict):
 
     primer_isotype = 'no_primer'
@@ -624,6 +656,7 @@ def call_C_primer(C_seq, C_primer_match_dict):
 
     return primer_isotype, C_seq_without_primer
 
+
 def translate_AA(seq, CDR3_start):
     if CDR3_start == -1: return "" # do not translate if we could not find CDR3 start anchor
     frame = CDR3_start % 3
@@ -636,12 +669,14 @@ def translate_AA(seq, CDR3_start):
     AA = Seq(seq_to_translate).translate()
     return AA
 
+
 def calc_region_lengths(boundaries):
     lengths = [-1, -1, -1, -1, -1, -1]
     for i, l in enumerate(lengths):
         if boundaries[i+1] != -1 and boundaries[i] != -1:
             lengths[i] = boundaries[i+1] - boundaries[i]
     return lengths
+
 
 def find_nearest_boundary_to_CDR3_start(boundaries):
 
@@ -650,6 +685,7 @@ def find_nearest_boundary_to_CDR3_start(boundaries):
             return boundaries[i] - 1
 
     return 0
+
 
 def convert_boundaries_to_VDJ_seq_indexing(boundaries):
 
@@ -676,6 +712,9 @@ def convert_boundaries_to_VDJ_seq_indexing(boundaries):
 
         return boundaries
 
+
+
+# Script
 if __name__ == "__main__":
 
     import argparse

@@ -13,93 +13,38 @@ import os
 import sys
 from subprocess import call
 
-from filenames import (get_sample_table_filename,
-                       get_germline_db_filename,
-                       get_igblast_auxiliary_data_filename,
-                       get_igblast_execfile)
+from filenames import get_sample_table_filename
 
-
-
-# Functions
-def run_igblast(filename):
-    '''Takes a file from antidengue/data/fasta/ and runs it through igblast
-    
-    Parameters:
-        filename - the name of the fasta
-    '''
-    import tempfile
-    import shutil
-    # igblast is terrible and does stuff only in its own folder, so let's make
-    # a temp folder for that
-    tmp_foldername = tempfile.mkdtemp()
-
-    # Move igblast into the temp
-    igblast_tmp = tmp_foldername + 'igblastn'
-    shutil.copy(get_igblast_execfile(), igblast_tmp)
-
-    # Move input file into the temp
-    filename_tmp = tmp_foldername + 'input.fasta'
-    shutil.copy(filename, filename_tmp)
-
-    filename_out_tmp = filename_tmp[:-6] + '_out'
-
-    call([igblast_tmp,
-          '-out', filename_out_tmp,
-          '-query', filename_tmp,
-          '-num_alignments_V=1',
-          '-num_alignments_D=1',
-          '-num_alignments_J=1',
-          '-evalue=1e-20',
-          '-germline_db_V', get_germline_db_filename('V'), 
-          '-germline_db_D', get_germline_db_filename('D'),
-          '-germline_db_J', get_germline_db_filename('J'),
-          '-domain_system', 'imgt',
-          '-auxiliary_data', get_igblast_auxiliary_data_filename(),
-         ])
-    
-    return filename_out_tmp
-
-
-
-def run_parse(fasta, blast_out, sample_info):
-    '''Runs parse_igblast.py in the igblast_dump folder and sends the parsedfile to the by_patient directory
-    
-    Parameters:
-        fasta - the fasta file
-        blast_out - the output of igblast
-        dataframe - the pandas dataframe containing patient info
-    '''
-    accession_num = blast_out[:-4]
-    igblast_dump = '/Users/davidglass/antidengue/data/ig_parse_dump/' + accession_num
-    destination_directory = '/Users/davidglass/antidengue/data/by_sample'
-    patient_id = ""
-    time_point = ""
-    
-    call(['cp', '/Users/davidglass/antidengue/src/parse_igblast.py', igblast_dump])
-    os.chdir(igblast_dump)
-    call(['python', 'parse_igblast.py', fasta, blast_out])
-    
-    # find the ID from the sample_info DataFrame
-    patient_id = str(sample_info.loc[accession_num][0])
-    time_point = str(sample_info.loc[accession_num][4])
-    new_filename = patient_id + "_" + time_point + "_" + accession_num
-    
-    call(['mv', 'parsed_igblast.txt', new_filename])
-    call(['mv', new_filename, destination_directory])
-    call(['rm', fasta])
-    call(['rm', 'parse_igblast.py'])
-    
 
 
 # Classes
+class SampleTable(pd.DataFrame):
+    '''Table of antibody sequence samples'''
+
+    @property
+    def _constructor(self):
+        return SampleTable
+
+
+    @property
+    def _constructor_sliced(self):
+        return pd.Series
+
+
+    @property
+    def _constructor_expanddim(self):
+        raise NotImplementedError
+
+
+
 class LineageMaker():
     '''Make Antibody lineages from patient sequencing data'''
     def __init__(self):
-        self.sample_info = self._get_sample_info_from_csv()
+        self.sample_table = self.get_sample_info_from_csv()
 
 
     @staticmethod
-    def _get_sample_info_from_csv():
+    def get_sample_info_from_csv():
         '''Puts the info from the sample_info csv into a pandas dataframe and returns it
          
         Parameters:
@@ -107,10 +52,11 @@ class LineageMaker():
         '''
         
         fn = get_sample_table_filename()
-        sample_info = pd.DataFrame().from_csv(fn)
+        sample_info = SampleTable.from_csv(fn)
         return sample_info
 
 
+    @staticmethod
     def get_reads_filenames(fmt):
         '''Get filenames of reads
         
@@ -121,32 +67,145 @@ class LineageMaker():
         return grf(fmt=fmt)
 
     
+    @staticmethod
     def get_sample_filename(samplename, fmt='fastq'):
         '''Get the filename of a sample'''
         from filenames import get_sample_filename as gsf
         return gsf(samplename, fmt=fmt)
 
 
-    def convert_reads_to_fasta():
+    def convert_reads_to_fasta(self, samplenames=None):
         '''Convert reads from FASTQ to FASTA'''
-        from filenames import get_reads_foldername as grfn
+        from filenames import get_reads_foldername as gfn
         from util import mkdirs
 
+        if samplenames is None:
+            samplenames = self.sample_table.index
+
         # Make output folder if not existant
-        mkdirs(grfn('fasta'))
+        mkdirs(gfn('fasta'))
 
         # Convert
+        from Bio.SeqIO.QualityIO import FastqGeneralIterator as FGI
+        for samplename in samplenames:
+            fn_fastq = self.get_sample_filename(samplename, fmt='fastq')
+            fn_fasta = self.get_sample_filename(samplename, fmt='fasta')
+            if not os.path.isfile(fn_fastq):
+                print(samplename+' fastq file not found:', fn_fastq)
+                continue
+
+            with open(fn_fastq, 'r') as f_fq, open(fn_fasta, 'w') as f_fa:
+                for (label, seq, qual) in FGI(f_fq):
+                    f_fa.write('>'+label+'\n')
+                    f_fa.write(seq+'\n')
+
+
+    def run_igblast(self, samplenames=None):
+        '''Takes a file from antidengue/data/fasta/ and runs it through igblast
+        
+        Parameters:
+            filename - the name of the fasta
+        '''
+
+        def get_environment_igblast():
+            '''Set environment for igblast call
+            
+            igblast uses the IGDATA environment variable to find the
+            "internal_data" folder with some human V germline nonsense
+            '''
+            from filenames import get_igblastdb_foldername
+            env = dict(os.environ)
+            if 'IGDATA' not in env:
+                env['IGDATA'] = get_igblastdb_foldername()[:-1]
+            return env
+
+        from filenames import get_igblasted_foldername as gfn
+        from filenames import (get_igblast_execfile,
+                               get_germline_db_filename,
+                               get_igblast_auxiliary_data_filename)
+        from util import mkdirs
+
+        if samplenames is None:
+            samplenames = self.sample_table.index
+
+        # Make output folder if not existant
+        mkdirs(gfn())
+    
+        for samplename in samplenames:
+            filename_in = self.get_sample_filename(samplename, fmt='fasta')
+            if not os.path.isfile(filename_in):
+                print(samplename+' fasta file not found:', filename_in)
+                continue
+
+            filename_out = self.get_sample_filename(samplename, fmt='igblasted')
+            cll = [get_igblast_execfile(),
+                   '-out', filename_out,
+                   '-query', filename_in,
+                   '-num_alignments_V=1',
+                   '-num_alignments_D=1',
+                   '-num_alignments_J=1',
+                   '-evalue=1e-20',
+                   '-organism', 'human',
+                   '-ig_seqtype', 'Ig',
+                   '-num_threads', '2',
+                   '-germline_db_V', get_germline_db_filename('V'), 
+                   '-germline_db_D', get_germline_db_filename('D'),
+                   '-germline_db_J', get_germline_db_filename('J'),
+                   '-domain_system', 'imgt',
+                   '-auxiliary_data', get_igblast_auxiliary_data_filename(),
+                  ]
+            print(' '.join(cll))
+            call(cll, env=get_environment_igblast())
+    
+    
+    def parse_igblast(self, samplenames=None):
+        '''Runs parse_igblast.py in the igblast_dump folder and sends the parsedfile to the by_patient directory
+        
+        Parameters:
+            fasta - the fasta file
+            blast_out - the output of igblast
+            dataframe - the pandas dataframe containing patient info
+        '''
+
+        from filenames import get_igblastparsed_foldername as gfn
+        from util import mkdirs
+        from parse_igblast import main as parse_function
+
+        if samplenames is None:
+            samplenames = self.sample_table.index
+
+        # Make output folder if not existant
+        mkdirs(gfn())
+
+        for samplename in samplenames:
+            filename_fa = self.get_sample_filename(samplename, fmt='fasta')
+            if not os.path.isfile(filename_fa):
+                print(samplename+' fasta file not found:', filename_fa)
+                continue
+            filename_in = self.get_sample_filename(samplename, fmt='igblasted')
+            if not os.path.isfile(filename_in):
+                print(samplename+' igblasted file not found:', filename_in)
+                continue
+
+            filename_out = self.get_sample_filename(samplename, fmt='igblastparsed')
+
+            # Call the function from the parser module
+            parse_function(filename_fa,
+                           filename_in,
+                           output_filename=filename_out,
+                           len_C_cutoff_min=0,
+                           len_C_cutoff_max=10000,
+                           log_V_Evalue_cutoff=-5.0,
+                           log_J_Evalue_cutoff=-5.0)
 
 
 
     def pipeline(self):
-        '''Runs a fasta through igblast and then parses the output and properly sorts files
-        
-        '''
-        raw_filenames = self.get_reads_filenames('fasta')
-        for fn in raw_filenames:
-            blast_out = run_igblast(filename)
-            run_parse(filename, blast_out, self.sample_info)
+        '''Runs a fasta through igblast, parses the output and sorts files'''
+        self.convert_reads_to_fasta()
+        self.run_igblast()
+        self.parse_igblast()
+
 
 
 
@@ -155,5 +214,5 @@ class LineageMaker():
 if __name__ == '__main__':
 
     lm = LineageMaker()
-    #lm.pipeline()
+    lm.pipeline()
 
