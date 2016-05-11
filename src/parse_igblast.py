@@ -451,7 +451,7 @@ def get_end(line):
     vals = line.rstrip().split("\t")
     return int(vals[2])
 
-def parse_(f):
+def parse_boundaries(f):
 
     boundaries = [-1, -1, -1, -1, -1, -1, -1]
 
