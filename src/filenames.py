@@ -26,6 +26,12 @@ def get_sample_table_filename():
     return root_fn + 'sample_info.csv'
 
 
+def get_lineage_table_filename():
+    '''Get the filename of the sample table'''
+    root_fn = get_root_data_foldername()
+    return root_fn + 'lineage_info.csv'
+
+
 def get_reads_foldername(fmt='fastq'):
     '''Get the folder name of the reads'''
     fn = get_root_data_foldername() + fmt + '/'
@@ -42,6 +48,22 @@ def get_igblastparsed_foldername():
     '''Get the folder name of the blasted reads'''
     fn = get_root_data_foldername() + 'igblastparsed/'
     return fn
+
+
+def get_lineages_foldername(options=None):
+    '''Get the foldername of the lineages'''
+    fn = get_root_data_foldername() + 'lineages'
+    if options is not None:
+        if 'distance' in options:
+            fn += '_'+str(options['distance'])
+    fn += '/'
+    return fn
+
+
+def get_lineage_filename(lineagename, options=None):
+    '''Get the filename of a lineage'''
+    fn = get_lineages_foldername(options=options)
+    return fn + lineagename + '.csv'
 
 
 def get_sample_filename(samplename, fmt='fastq'):

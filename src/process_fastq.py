@@ -13,7 +13,6 @@ import os
 import sys
 from subprocess import call
 
-from filenames import get_sample_table_filename
 
 
 
@@ -36,24 +35,19 @@ class SampleTable(pd.DataFrame):
         raise NotImplementedError
 
 
+    @classmethod
+    def from_sampletable(cls):
+        '''Puts the info from the sample_info csv'''
+        from filenames import get_sample_table_filename
+        
+        fn = get_sample_table_filename()
+        return cls.from_csv(fn)
+
 
 class LineageMaker():
     '''Make Antibody lineages from patient sequencing data'''
     def __init__(self):
-        self.sample_table = self.get_sample_info_from_csv()
-
-
-    @staticmethod
-    def get_sample_info_from_csv():
-        '''Puts the info from the sample_info csv into a pandas dataframe and returns it
-         
-        Parameters:
-            csv - the csv file
-        '''
-        
-        fn = get_sample_table_filename()
-        sample_info = SampleTable.from_csv(fn)
-        return sample_info
+        self.sample_table = SampleTable.from_sampletable()
 
 
     @staticmethod
