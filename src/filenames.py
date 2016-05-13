@@ -44,9 +44,9 @@ def get_igblasted_foldername():
     return fn
 
 
-def get_igblastparsed_foldername():
+def get_by_sample_foldername():
     '''Get the folder name of the blasted reads'''
-    fn = get_root_data_foldername() + 'igblastparsed/'
+    fn = get_root_data_foldername() + 'by_sample/'
     return fn
 
 
@@ -72,8 +72,8 @@ def get_sample_filename(samplename, fmt='fastq'):
         fn = get_reads_foldername(fmt=fmt) + samplename + '.' + fmt
     elif fmt == 'igblasted':
         fn = get_igblasted_foldername() + samplename + '.igblasted'
-    elif fmt == 'igblastparsed':
-        fn = get_igblastparsed_foldername() + samplename + '.csv'
+    elif fmt == 'by_sample':
+        fn = get_by_sample_foldername() + samplename + '.csv'
     return fn
 
 
@@ -113,3 +113,16 @@ def get_igblast_execfile(variant='n'):
     else:
         raise ValueError('user not recognized')
 
+
+def get_parsed_filename(patient_id, time_point, samplename):
+    '''Get the parsed igblast filename from by_sample'''
+    filename = "patient_%s_time_point_%s_sample_id_%s" % (patient_id, time_point, samplename)
+    filename_with_directory = get_sample_filename(filename, fmt='by_sample')
+    return filename_with_directory
+            
+
+def format_lineage_filename(patient_id, v_gene, j_gene, CDR3_length):
+    '''Get the lineage filename given the lineage info'''
+    filename = "patient_%s_Vgene_%s_Jgene_%s_CDR3length_%s" % (patient_id, v_gene, j_gene, CDR3_length)
+    fn = get_lineage_filename(filename)
+    return fn

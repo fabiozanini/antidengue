@@ -373,8 +373,8 @@ def parse_record(f, seq_id, seq, out, out_C_seq_file, C_primer_match_dict, len_C
 
     # Split sequence into V, D and J
     V_seq = seq[query_start_position-1:boundaries[5]-1]
-    D_seq = seq[boundaries[5]-1:boundaries[6]-1]
-    J_seq = seq[boundaries[6]-1:query_end_position-1]
+    D_seq = seq[boundaries[5]-1:boundaries[6]]
+    J_seq = seq[boundaries[6]:query_end_position-1]
 
     primer_isotype, C_seq_without_primer = call_C_primer(C_seq, C_primer_match_dict)
 
