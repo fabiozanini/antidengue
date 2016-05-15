@@ -33,3 +33,34 @@ def hamming(seq1, seq2):
     arr1 = np.fromstring(seq1, 'S1')
     arr2 = np.fromstring(seq2, 'S1')
     return (arr1 != arr2).sum()
+
+
+def write_tree_to_json(tree, output_file,
+                       metadata_tree=[],
+                       metadata_nodes=[],
+                       children_attrname="children"):
+    '''Write Biopython tree to JSON'''
+
+    tree_dict = {}
+    metadata_tree = [m for m in metadata_tree if m not in ['tree']]
+    for field in metadata_tree:
+        if hasattr(tree, field):
+            tree_dict[field] = getattr(tree, field)
+
+
+    not_metadata = ['clades', children_attrname]
+    metadata_nodes = [m for m in metadata_nodes if m not in not_metadata]
+    def convert_to_dict(node):
+        d = {}
+        for field in metadata_nodes:
+            if hasattr(node, field):
+                d[field] = getattr(node, field)
+        d[children_attrname] = [convert_to_dict(c) for c in node.clades]
+        return d
+
+    tree_dict['tree'] = convert_to_dict(tree.root)
+
+    import json
+    with open(output_file, 'w') as handle:
+        json.dump(tree_dict, handle, indent=1)
+

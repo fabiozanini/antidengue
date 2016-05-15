@@ -148,7 +148,7 @@ class TreeMaker():
             os.remove(tmp_filename)
 
 
-    def build_trees(self, lineagenames=None, region='CDR3'):
+    def build_trees(self, lineagenames=None):
         '''Align sequences from a lineage in perspective of making a tree'''
         import subprocess as sp
 
@@ -178,6 +178,44 @@ class TreeMaker():
             sp.call(call)
 
 
+    def annotate_trees(self, lineagenames=None):
+        '''Annotate the trees with metadata and save as JSON'''
+        from Bio import Phylo
+
+        from util import write_tree_to_json
+
+        if lineagenames is None:
+            lineagenames = self.lineage_table.index
+
+        for lineagename in lineagenames:
+            fn_lineage = self.get_lineage_filename(lineagename)
+            fn_tree = self.get_lineage_filename(lineagename, options=['tree'])
+
+            if not os.path.isfile(fn_lineage):
+                print(lineagename+' lineage file not found:', fn_lineage)
+                continue
+
+            if not os.path.isfile(fn_tree):
+                print(lineagename+' newick tree file not found:', fn_tree)
+                continue
+
+            data = pd.read_csv(fn_lineage, usecols=['#sequence_id', 'CDR3_seq'],
+                               index_col='#sequence_id',
+                               sep='\t')
+            data.index.name = 'sequence_id'
+
+            tree = Phylo.read(fn_tree, 'newick')
+
+            # Annotate leaves
+            for leaf in tree.get_terminals():
+                leaf.sequence_CDR3 = data.loc[leaf.name, 'CDR3_seq']
+
+            # Save to JSON
+            fn_tree = self.get_lineage_filename(lineagename, options=['tree_JSON'])
+            write_tree_to_json(tree, fn_tree,
+                               metadata_nodes=['sequence_CDR3'])
+
+
     def pipeline(self, lineagenames=None, steps=None):
         '''Run the pipeline'''
         if (steps is None) or ('align' in steps):
@@ -186,6 +224,8 @@ class TreeMaker():
         if (steps is None) or ('build_trees' in steps):
             self.build_trees(lineagenames=lineagenames)
 
+        if (steps is None) or ('annotate_trees' in steps):
+            self.annotate_trees(lineagenames=lineagenames)
 
 
 # Script

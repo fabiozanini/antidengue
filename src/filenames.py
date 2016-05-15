@@ -58,7 +58,7 @@ def get_lineages_foldername(options=None):
             fn += '_'+str(options['distance'])
         if 'alignment' in options:
             fn += '/alignments'
-        elif 'tree' in options:
+        elif ('tree' in options) or ('tree_JSON' in options):
             fn += '/trees'
 
     fn += '/'
@@ -73,6 +73,8 @@ def get_lineage_filename(lineagename, options=None):
         fn+= '.fasta'
     elif (options is not None) and ('tree' in options):
         fn+= '.nwk'
+    elif (options is not None) and ('tree_JSON' in options):
+        fn+= '.json'
     else:
         fn+= '.csv'
     return fn

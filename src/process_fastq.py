@@ -382,7 +382,6 @@ class LineageMaker():
 if __name__ == '__main__':
 
     import argparse
-
     parser = argparse.ArgumentParser(description='Adds single sample processing functionality')
     parser.add_argument('-s', '--samplenames', nargs='+', default=None,
                         help='a list of sample names to run through the process')
