@@ -124,9 +124,9 @@ class TreeMaker():
                 print(lineagename+' lineage file not found:', fn_lineage)
                 continue
 
-            data = pd.read_csv(fn_lineage, usecols=['#sequence_id', 'CDR3_seq'],
+            data = pd.read_csv(fn_lineage, usecols=['#sequence_id', region+'_seq'],
                                index_col='#sequence_id',
-                               sep='\t')['CDR3_seq']
+                               sep='\t')[region+'_seq']
             data.index.name = 'sequence_id'
 
             # Copy sequence data into temporary fasta
@@ -145,16 +145,58 @@ class TreeMaker():
             print(' '.join(call))
             sp.call(call)
 
+            os.remove(tmp_filename)
 
-    def pipeline(self, lineagenames=None):
+
+    def build_trees(self, lineagenames=None, region='CDR3'):
+        '''Align sequences from a lineage in perspective of making a tree'''
+        import subprocess as sp
+
+        from filenames import get_lineages_foldername as gfn
+        from filenames import get_fasttree_execfile
+        from util import mkdirs
+
+        if lineagenames is None:
+            lineagenames = self.lineage_table.index
+
+        # Make output folder if not extant
+        mkdirs(gfn(options=self._merge_lineage_options(['tree'])))
+
+        for lineagename in lineagenames:
+            fn_aligned = self.get_lineage_filename(lineagename, options=['alignment'])
+            fn_tree = self.get_lineage_filename(lineagename, options=['tree'])
+            if not os.path.isfile(fn_aligned):
+                print(lineagename+' aligned lineage file not found:', fn_aligned)
+                continue
+
+            call = [get_fasttree_execfile(),
+                    '-nt',
+                    '-out', fn_tree,
+                    '-quiet',
+                    fn_aligned]
+            print(' '.join(call))
+            sp.call(call)
+
+
+    def pipeline(self, lineagenames=None, steps=None):
         '''Run the pipeline'''
-        self.align_lineages(lineagenames=lineagenames)
+        if (steps is None) or ('align' in steps):
+            self.align_lineages(lineagenames=lineagenames)
+
+        if (steps is None) or ('build_trees' in steps):
+            self.build_trees(lineagenames=lineagenames)
 
 
 
 # Script
 if __name__ == '__main__':
 
+    import argparse
+    parser = argparse.ArgumentParser(description='Adds single sample processing functionality')
+    parser.add_argument('--steps', nargs='+', default=None,
+                        help='pipeline steps to perform')
+    args = parser.parse_args()
+
     tm = TreeMaker()
-    tm.pipeline()
+    tm.pipeline(steps=args.steps)
 

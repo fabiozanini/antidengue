@@ -58,6 +58,9 @@ def get_lineages_foldername(options=None):
             fn += '_'+str(options['distance'])
         if 'alignment' in options:
             fn += '/alignments'
+        elif 'tree' in options:
+            fn += '/trees'
+
     fn += '/'
     return fn
 
@@ -68,6 +71,8 @@ def get_lineage_filename(lineagename, options=None):
     fn += lineagename
     if (options is not None) and ('alignment' in options):
         fn+= '.fasta'
+    elif (options is not None) and ('tree' in options):
+        fn+= '.nwk'
     else:
         fn+= '.csv'
     return fn
@@ -127,6 +132,16 @@ def get_muscle_execfile():
         raise NotImplementedError('DAVID PLEASE ADD YOUR MUSCLE PATH TO FILENAMES.PY')
     elif 'fabio' in os.getenv('HOME'):
         return '/usr/bin/muscle'
+    else:
+        raise ValueError('user not recognized')
+
+
+def get_fasttree_execfile():
+    '''Get the executable of igblastn/igblastp'''
+    if 'glass' in os.getenv('HOME'):
+        raise NotImplementedError('DAVID PLEASE ADD YOUR FASTTREE PATH TO FILENAMES.PY')
+    elif 'fabio' in os.getenv('HOME'):
+        return '/usr/bin/FastTree'
     else:
         raise ValueError('user not recognized')
 
