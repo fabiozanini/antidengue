@@ -56,6 +56,8 @@ def get_lineages_foldername(options=None):
     if options is not None:
         if 'distance' in options:
             fn += '_'+str(options['distance'])
+        if 'alignment' in options:
+            fn += '/alignments'
     fn += '/'
     return fn
 
@@ -63,7 +65,12 @@ def get_lineages_foldername(options=None):
 def get_lineage_filename(lineagename, options=None):
     '''Get the filename of a lineage'''
     fn = get_lineages_foldername(options=options)
-    return fn + lineagename + '.csv'
+    fn += lineagename
+    if (options is not None) and ('alignment' in options):
+        fn+= '.fasta'
+    else:
+        fn+= '.csv'
+    return fn
 
 
 def get_sample_filename(samplename, fmt='fastq'):
@@ -110,6 +117,16 @@ def get_igblast_execfile(variant='n'):
         return '/Users/davidglass/Documents/resources/ncbi-igblast-1.4.0/bin/igblast' + variant
     elif 'fabio' in os.getenv('HOME'):
         return '/usr/bin/igblast' + variant
+    else:
+        raise ValueError('user not recognized')
+
+
+def get_muscle_execfile():
+    '''Get the executable of igblastn/igblastp'''
+    if 'glass' in os.getenv('HOME'):
+        raise NotImplementedError('DAVID PLEASE ADD YOUR MUSCLE PATH TO FILENAMES.PY')
+    elif 'fabio' in os.getenv('HOME'):
+        return '/usr/bin/muscle'
     else:
         raise ValueError('user not recognized')
 

@@ -194,12 +194,18 @@ class LineageMaker():
 
         from filenames import get_reads_foldername
 
-        header = "#sequence_id    abundance   V-gene  D-gene  J-gene  V_E-value   D_E-value   " + \
-        "J_E-value  FR3_seq CDR3_seq    FR4_seq const_seq   len_FR3 len_CDR3    len_FR4 " + \
-        "len_const  sequence_boundary_indices:FR1_CDR1_FR2_CDR2_FR3_CDR3_FR4    len_boundary    " + \
-        "stop_codon_present productive_sequence AA_seq_whole_read   mutation_positions  " + \
-        "germline_bases derived_bases   mutation_density    V_germline_identity leader_seq  " + \
-        "reads_per_molecule primer_isotype  sequence_reversed   seq quality"
+        header = '\t'.join(['#sequence_id', 'abundance',
+                            'V-gene', 'D-gene', 'J-gene',
+                            'V_E-value', 'D_E-value', 'J_E-value',
+                            'FR3_seq', 'CDR3_seq', 'FR4_seq', 'const_seq',
+                            'len_FR3', 'len_CDR3', 'len_FR4', 'len_const',
+                            'sequence_boundary_indices:FR1_CDR1_FR2_CDR2_FR3_CDR3_FR4',
+                            'len_boundary', 'stop_codon_present',
+                            'productive_sequence', 'AA_seq_whole_read',
+                            'mutation_positions', 'germline_bases', 'derived_bases',
+                            'mutation_density', 'V_germline_identity',
+                            'leader_seq', 'reads_per_molecule', 'primer_isotype',
+                            'sequence_reversed', 'seq', 'quality'])
 
         if samplenames is None:
             samplenames = self.sample_table.index
@@ -303,13 +309,18 @@ class LineageMaker():
                         all_samples[patient_id][sample_id] = lineage_data
         
 
-        header = "#sequence_id    abundance   V-gene  D-gene  J-gene  V_E-value   D_E-value   " + \
-        "J_E-value  FR3_seq CDR3_seq    FR4_seq const_seq   len_FR3 len_CDR3    len_FR4 " + \
-        "len_const  sequence_boundary_indices:FR1_CDR1_FR2_CDR2_FR3_CDR3_FR4    len_boundary    " + \
-        "stop_codon_present productive_sequence AA_seq_whole_read   mutation_positions  " + \
-        "germline_bases derived_bases   mutation_density    V_germline_identity leader_seq  " + \
-        "reads_per_molecule primer_isotype  sequence_reversed   seq quality"
-
+        header = '\t'.join(['#sequence_id', 'abundance',
+                    'V-gene', 'D-gene', 'J-gene',
+                    'V_E-value', 'D_E-value', 'J_E-value',
+                    'FR3_seq', 'CDR3_seq', 'FR4_seq', 'const_seq',
+                    'len_FR3', 'len_CDR3', 'len_FR4', 'len_const',
+                    'sequence_boundary_indices:FR1_CDR1_FR2_CDR2_FR3_CDR3_FR4',
+                    'len_boundary', 'stop_codon_present',
+                    'productive_sequence', 'AA_seq_whole_read',
+                    'mutation_positions', 'germline_bases', 'derived_bases',
+                    'mutation_density', 'V_germline_identity',
+                    'leader_seq', 'reads_per_molecule', 'primer_isotype',
+                    'sequence_reversed', 'seq', 'quality'])
         lineage_counts = Counter()
         for patient_id, patient_samples in all_samples.items():
             for sample_id, lineage_data in patient_samples.items():
