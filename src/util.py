@@ -27,6 +27,7 @@ def mkdirs(newdir):
 
 def hamming(seq1, seq2):
     '''Poor man's version of the hamming function'''
+    import numpy as np
     #FIXME: is this how the Distance package does it? Certainly this is the
     # formal definition but one never knows... check with David
     arr1 = np.fromstring(seq1, 'S1')

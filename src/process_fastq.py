@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import os
 import sys
 from subprocess import call
-from collections import defaultdict
+from collections import defaultdict, Counter
 
 
 # Classes
@@ -75,7 +75,7 @@ class LineageMaker():
         if samplenames is None:
             samplenames = self.sample_table.index
 
-        # Make output folder if not existant
+        # Make output folder if not extant
         mkdirs(gfn('fasta'))
 
         # Convert
@@ -121,7 +121,7 @@ class LineageMaker():
         if samplenames is None:
             samplenames = self.sample_table.index
 
-        # Make output folder if not existant
+        # Make output folder if not extant
         mkdirs(gfn())
     
         for samplename in samplenames:
@@ -162,7 +162,7 @@ class LineageMaker():
         if samplenames is None:
             samplenames = self.sample_table.index
 
-        # Make output folder if not existant
+        # Make output folder if not extant
         mkdirs(gfn())
 
         for samplename in samplenames:
@@ -175,7 +175,7 @@ class LineageMaker():
                 print(samplename+' igblasted file not found:', filename_in)
                 continue
 
-            filename_out = self.get_parsed_name(samplename)
+            filename_out = self.get_igblast_parsed_filename(samplename)
 
             # Call the function from the parser module
             parse_function(filename_fa,
@@ -187,43 +187,51 @@ class LineageMaker():
                            log_J_Evalue_cutoff=-5.0)
 
 
-    def append_by_sample(self, samplenames=None):
+    def add_sequence_quality_by_sample(self, samplenames=None):
         '''Renames the parsed igblast file by patient, timepoint, and ID. Adds the complete nucleotide
         sequence and quality scores for each sequence. Prepends the file with a header.
         '''
 
         from filenames import get_reads_foldername
 
-        header = "###sequence_id    abundance   V-gene  D-gene  J-gene  V_E-value   D_E-value   " + \
+        header = "#sequence_id    abundance   V-gene  D-gene  J-gene  V_E-value   D_E-value   " + \
         "J_E-value  FR3_seq CDR3_seq    FR4_seq const_seq   len_FR3 len_CDR3    len_FR4 " + \
         "len_const  sequence_boundary_indices:FR1_CDR1_FR2_CDR2_FR3_CDR3_FR4    len_boundary    " + \
         "stop_codon_present productive_sequence AA_seq_whole_read   mutation_positions  " + \
         "germline_bases derived_bases   mutation_density    V_germline_identity leader_seq  " + \
-        "reads_per_molecule primer_isotype  sequence_reversed   seq quality###\n"
+        "reads_per_molecule primer_isotype  sequence_reversed   seq quality"
 
         if samplenames is None:
             samplenames = self.sample_table.index
 
         for samplename in samplenames:
             fn_fastq = self.get_sample_filename(samplename, fmt='fastq')
-            fn_by_sample = self.get_parsed_name(samplename)
-            
-            with open(fn_fastq, 'r') as f_fq, open(fn_by_sample, 'r') as f_bs: 
-                fastq_lines = f_fq.readlines()
-                parsed_lines = []
-                parsed_lines.append(header)
-                parsed_lines += f_bs.readlines()
+            fn_by_sample = self.get_igblast_parsed_filename(samplename)
 
-            for i in range(1,len(parsed_lines)):
-                parsed_lines[i] = parsed_lines[i].strip('\n') + "\t" + \
-                                    fastq_lines[(i*4)-3].strip('\n') + "\t" + fastq_lines[(i*4)-1]
+            if not os.path.isfile(fn_fastq):
+                print(samplename+' fastq file not found:', fn_fastq)
+                continue
+            
+            if not os.path.isfile(fn_by_sample):
+                print(samplename+' parsed igblast file not found:', fn_by_sample)
+                continue
+            
+            with open(fn_fastq, 'r') as f_fq:
+                fastq_lines = f_fq.readlines()
+
+            with open(fn_by_sample, 'r') as f_bs: 
+                parsed_lines = [header] + f_bs.readlines()
+
+            for i in range(1, len(parsed_lines)):
+                parsed_lines[i] = (parsed_lines[i].rstrip('\n') + '\t' +
+                                   fastq_lines[(i*4)-3].rstrip('\n') + '\t' +
+                                   fastq_lines[(i*4)-1].rstrip('\n'))
             
             with open (fn_by_sample, 'w') as fo:
-                for line in parsed_lines:
-                    fo.write(line)   
+                fo.write('\n'.join(parsed_lines))
 
 
-    def get_parsed_name(self, samplename):
+    def get_igblast_parsed_filename(self, samplename):
         '''Returns the by_sample filename for a given sample.
         '''
         from filenames import get_parsed_filename as gfn
@@ -244,16 +252,7 @@ class LineageMaker():
         return filename
 
 
-    def pipeline(self, samplenames=None):
-        '''Runs a fasta through igblast, parses the output and sorts files'''
-        self.convert_reads_to_fasta(samplenames=samplenames)
-        self.run_igblast(samplenames=samplenames)
-        self.parse_igblast(samplenames=samplenames)
-        self.append_by_sample(samplenames=samplenames)
-        self.sort_lineages(samplenames=samplenames)
-
-
-    def sort_lineages(self, samplenames=None):
+    def sort_by_lineage(self, samplenames=None):
         '''Sorts sequences into files based on lineage. This is defined by patient, V gene, 
         J gene, and CDR3 length.
         '''
@@ -262,7 +261,10 @@ class LineageMaker():
             '''Takes a line from the parsed Igblast file and returns an ID string and an array 
             containing V gene, J gene, and CDR3 length.
             '''
-            
+            line = line.rstrip('\n')
+            if not line:
+                return None, None
+
             split_line = line.split()
             sample_id = ''
             lineage_data = [None] * 3
@@ -277,44 +279,91 @@ class LineageMaker():
         from util import mkdirs
         from filenames import get_lineages_foldername as gfn
 
-        mkdirs(gfn())
-
         if samplenames is None:
             samplenames = self.sample_table.index
 
-        all_samples = defaultdict(dict)
+        # Make output folder if not extant
+        mkdirs(gfn())
 
+        all_samples = defaultdict(dict)
         for samplename in samplenames:
-            fn_by_sample = self.get_parsed_name(samplename)
-            patient_id = str(self.sample_table.loc[samplename][0])
+            patient_id = str(self.sample_table.loc[samplename, 'Specimen ID'])
+            fn_by_sample = self.get_igblast_parsed_filename(samplename)
+
+            if not os.path.isfile(fn_by_sample):
+                print(samplename+' parsed igblast file not found:', fn_by_sample)
+                continue
+
             with open(fn_by_sample, 'r') as f_bs:
                 for line in f_bs:
-                    if not line.startswith('#'):
-                        sample_id, lineage_data = parse_line(line)
+                    if line.startswith('#'):
+                        continue
+                    sample_id, lineage_data = parse_line(line)
+                    if lineage_data is not None:
                         all_samples[patient_id][sample_id] = lineage_data
         
-        for patient_id in all_samples:
-            for sample_id in all_samples[patient_id]:
-                 samplename = sample_id[:sample_id.find('.')]
-                 fn_by_sample = self.get_parsed_name(samplename)
-                 fn_lineage = self.get_lineage_name(patient_id, all_samples[patient_id][sample_id])
-                 with open(fn_lineage, 'a+') as f_l, open(fn_by_sample, 'r') as f_bs:
+
+        header = "#sequence_id    abundance   V-gene  D-gene  J-gene  V_E-value   D_E-value   " + \
+        "J_E-value  FR3_seq CDR3_seq    FR4_seq const_seq   len_FR3 len_CDR3    len_FR4 " + \
+        "len_const  sequence_boundary_indices:FR1_CDR1_FR2_CDR2_FR3_CDR3_FR4    len_boundary    " + \
+        "stop_codon_present productive_sequence AA_seq_whole_read   mutation_positions  " + \
+        "germline_bases derived_bases   mutation_density    V_germline_identity leader_seq  " + \
+        "reads_per_molecule primer_isotype  sequence_reversed   seq quality"
+
+        lineage_counts = Counter()
+        for patient_id, patient_samples in all_samples.items():
+            for sample_id, lineage_data in patient_samples.items():
+                samplename = sample_id.split('.')[0]
+                fn_by_sample = self.get_igblast_parsed_filename(samplename)
+                fn_lineage = self.get_lineage_name(patient_id, lineage_data)
+
+                if not os.path.isfile(fn_by_sample):
+                    print(samplename+' parsed igblast file not found:', fn_by_sample)
+                    continue
+
+                lineage_counts[os.path.basename(fn_lineage)] += 1
+                if lineage_counts[os.path.basename(fn_lineage)] == 1:
+                    with open(fn_lineage, 'w') as f_l:
+                        f_l.write(header+'\n')
+
+                with open(fn_by_sample, 'r') as f_bs, open(fn_lineage, 'a') as f_l:
                     for line in f_bs:
                         if sample_id in line:
                             f_l.write(line)
                             break  
 
 
-    def temporary_get_samples(self, samplenumber, samplenames):
-        '''To be deleted after testing. Takes the samplenumber input and grabs the first X samples
-        to run through the pipeline.
-        '''
+    def pipeline(self, samplenames=None, steps=None):
+        '''Runs a fasta through igblast, parses the output and sorts files'''
+        if (steps is None) or ('convert_fastq' in steps):
+            self.convert_reads_to_fasta(samplenames=samplenames)
         
+        if (steps is None) or ('igblast' in steps):
+            self.run_igblast(samplenames=samplenames)
+
+        if (steps is None) or ('parse_igblast' in steps):
+            self.parse_igblast(samplenames=samplenames)
+
+        if (steps is None) or ('add_sequence_quality' in steps):
+            self.add_sequence_quality_by_sample(samplenames=samplenames)
+
+        if (steps is None) or ('sort_by_lineage' in steps):
+            self.sort_by_lineage(samplenames=samplenames)
+
+
+    # FIXME: To be deleted after testing!!
+    def temporary_get_samples(self, samplenumber=-1, samplenames=None):
+        '''Grabs the first 'samplenumber' samples to run through the pipeline'''
+        
+        if samplenames is not None:
+            return samplenames
+
         if samplenumber == -1:
             return samplenames
-        samplenames=[]
-        for i in range(0, samplenumber[0]):
-            samplenames.append(self.sample_table.index[i])
+
+        samplenames = []
+        for i in range(samplenumber):
+            samplenames.append(self.sample_table.index.iloc[i])
         return samplenames
 
 
@@ -324,12 +373,14 @@ if __name__ == '__main__':
     import argparse
 
     parser = argparse.ArgumentParser(description='Adds single sample processing functionality')
-    parser.add_argument('-s', '--samplenames', nargs='+', type=str, default=None, \
+    parser.add_argument('-s', '--samplenames', nargs='+', default=None,
                         help='a list of sample names to run through the process')
-    parser.add_argument('-n', '--samplenumber', nargs='+', type=int, default='-1', \
+    parser.add_argument('-n', '--samplenumber', type=int, default=-1,
                          help='an integer directing the pipeline to be run on the first X samples')
+    parser.add_argument('--steps', nargs='+', default=None,
+                        help='pipeline steps to perform')
     args = parser.parse_args()
 
     lm = LineageMaker()
     samplenames = lm.temporary_get_samples(args.samplenumber, args.samplenames)
-    lm.pipeline(samplenames)
+    lm.pipeline(samplenames=samplenames, steps=args.steps)

@@ -617,9 +617,11 @@ def call_CDR3_end(VDJ_seq, CDR3_start):
     CDR3_end = -1
 
     for i in range(CDR3_start, len(VDJ_seq) - len(CDR3_end_anchor_sequence) + 1):
-        try:
-            d = hamming(VDJ_seq[i:i+len(CDR3_end_anchor_sequence)], CDR3_end_anchor_sequence)
-        except:
+        seq1 = VDJ_seq[i:i+len(CDR3_end_anchor_sequence)]
+        seq2 = CDR3_end_anchor_sequence
+        if len(seq1) == len(seq2):
+            d = hamming(seq1, seq2)
+        else:
             print('expected two strings of the same length for hamming')
             d=10
         if d <= minimum_match_distance:
